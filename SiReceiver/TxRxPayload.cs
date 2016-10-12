@@ -21,8 +21,8 @@ namespace SiReceiver
             rssi = payloadBuff[0];
             pwrLevel = payloadBuff[1];
             packetId = (ushort)(payloadBuff[2] | (payloadBuff[3] << 8));
-            longtitude = (payloadBuff[4]) | (payloadBuff[5] << 8) | (payloadBuff[6] << 16) | (payloadBuff[7] << 24);
-            latitude = (payloadBuff[8]) | (payloadBuff[9] << 8) | (payloadBuff[10] << 16) | (payloadBuff[11] << 24);
+            latitude = (payloadBuff[4]) | (payloadBuff[5] << 8) | (payloadBuff[6] << 16) | (payloadBuff[7] << 24);
+            longtitude = (payloadBuff[8]) | (payloadBuff[9] << 8) | (payloadBuff[10] << 16) | (payloadBuff[11] << 24);
             
         }
 

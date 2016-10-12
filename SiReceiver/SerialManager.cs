@@ -30,6 +30,10 @@ namespace SiReceiver
         private byte[] serialBuffer = new byte[16384];
         private int buffIdx;
 
+        private byte[] payloadBuff = new byte[128];
+        private int payloadIdx;
+        private byte payloadLen;
+
         public bool OpenPort(string portName)
         {
             try
@@ -64,41 +68,55 @@ namespace SiReceiver
 
         private void Port_DataReceived(object sender, SerialDataReceivedEventArgs e)
         {
-            int read = port.Read(serialBuffer, buffIdx, port.BytesToRead);
-            buffIdx += read;
-            CheckBuffer();
+            int read = port.Read(serialBuffer, 0, port.BytesToRead);
+            for (int i = 0; i < read; i++) AddByte(serialBuffer[i]);
         }
 
-        private void CheckBuffer()
+        private void AddByte(byte b)
         {
-            int i = 0;
-            int dataLen;
-            for(; i < buffIdx - 2; i++)
+            if(payloadIdx == 0)
             {
-                dataLen = GetDataLen(i);
-                if(dataLen != -1)
+                if (b != 0xDE)
                 {
-                    if (dataLen + 2 + i >= buffIdx) return; // още данни трябват
-                    ProcessData(i + 3, dataLen - 1);
-                    i += dataLen + 3;
+                    payloadIdx = 0;
+                    return;
+                }
+                else payloadBuff[payloadIdx++] = b;
+            }
+            else if(payloadIdx == 1)
+            {
+                if (b != 0xAD)
+                {
+                    payloadIdx = 0;
+                    return;
+                }
+                else payloadBuff[payloadIdx++] = b;
+            }
+            else if(payloadIdx == 2)
+            {
+                payloadLen = (byte)(b - 1);
+                if(payloadLen > 64)
+                {
+                    payloadIdx = 0;
+                    return;
+                }
+                payloadBuff[payloadIdx++] = payloadLen;
+            }
+            else
+            {
+                payloadBuff[payloadIdx++] = b;
+                if(payloadIdx - 4 == payloadLen)
+                {
+                    ProcessData();
+                    payloadIdx = 0;
                 }
             }
-
-            int j = 0;
-            for (; i < buffIdx; i++) serialBuffer[j++] = serialBuffer[i];
-            buffIdx = j;
         }
 
-        private int GetDataLen(int idx)
+        
+        private void ProcessData()
         {
-            if (serialBuffer[idx] != 0xDE) return -1;
-            if (serialBuffer[idx + 1] != 0xAD) return -1;
-            return serialBuffer[idx + 2];
-        }
-
-        private void ProcessData(int dataStart, int dataLen)
-        {
-            byte msgType = serialBuffer[dataStart];
+            byte msgType = payloadBuff[3];
 
             switch(msgType)
             {
@@ -112,9 +130,9 @@ namespace SiReceiver
                     StatusMessageReceived?.Invoke(StatusMessage.CrcError);
                     break;
                 case 3:
-                    byte[] buffer = new byte[dataLen];
+                    byte[] buffer = new byte[payloadLen];
 
-                    Buffer.BlockCopy(serialBuffer, dataStart + 1, buffer, 0, dataLen);
+                    Buffer.BlockCopy(payloadBuff, 4, buffer, 0, payloadLen);
                     try
                     {
                         TxRxPayload trp = new TxRxPayload(buffer);
